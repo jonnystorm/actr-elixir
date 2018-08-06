@@ -35,11 +35,18 @@ defmodule Actr do
 
     case sig do
       {name, _, [arg]} ->
+        arg_name =
+          with {:\\, _, [name, _]} <- arg,
+            do: name
+
         quote do
           unquote(init)
 
           def unquote(name)(unquote(arg)) do
-            GenServer.start_link(__MODULE__, unquote(arg))
+            GenServer.start_link(
+              __MODULE__,
+              [unquote(arg_name)]
+            )
           end
         end
 

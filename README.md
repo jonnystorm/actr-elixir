@@ -40,8 +40,9 @@ defmodule Test do
   end
 
   # Define public API; define private API
-  deflink start_link, fn _args ->
-    {:ok, %{value: "stuff"}}
+  deflink start_link(initial \\ "stuff"), fn
+    [arg] ->
+      {:ok, %{value: arg}}
   end
 end
 

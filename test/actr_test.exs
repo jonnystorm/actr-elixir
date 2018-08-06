@@ -25,8 +25,9 @@ defmodule ActrTest do
       {:noreply, state}
     end
 
-    deflink start_link, fn _args ->
-      {:ok, %{value: "stuff"}}
+    deflink start_link(initial \\ "stuff"), fn
+      [arg] ->
+        {:ok, %{value: arg}}
     end
   end
 
@@ -46,6 +47,16 @@ defmodule ActrTest do
 
     assert TestServer.get(pid, :status)
       == {:ok, "things"}
+  end
+
+  test "It passes args to init!" do
+    initial_value = "test"
+
+    {:ok, pid} =
+      TestServer.start_link(initial_value)
+
+    assert TestServer.get(pid, :status)
+      == {:ok, initial_value}
   end
 
   test "An unmatched public API clause raises", %{pid: pid}
