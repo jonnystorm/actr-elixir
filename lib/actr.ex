@@ -13,34 +13,55 @@ defmodule Actr do
   end
 
   defp explode_fun(fun) do
-    { :fn, _, [
-        {:->, _, [args, body]},
-      ]
-    } = fun
+    {:fn, _, clauses} = fun
 
-    {args, body}
+    Enum.map clauses, fn clause ->
+      {:->, _, [args, body]} = clause
+
+      {args, body}
+    end
   end
 
-  defmacro deflink(sig, fun) do
-    {[args], body} =
-      explode_fun fun
+  defp inject_name_into_fun_sig(name, sig) do
+    case sig do
+      [{:when, meta, args_conds}] ->
+        condition = List.last args_conds
+        args = List.delete_at(args_conds, -1)
 
-    init =
-      quote do
-        @impl true
-        def init(unquote(args)) do
-          unquote(body)
-        end
+        wrapped = {name, [], args}
+
+        {:when, meta, [wrapped, condition]}
+
+      args ->
+        {name, [], args}
+    end
+  end
+
+  defp strip_block({:__block__, _, block}),
+    do: block
+
+  defmacro deflink(sig, fun) do
+    inits =
+      Enum.flat_map explode_fun(fun), fn {args, body} ->
+        named =
+          inject_name_into_fun_sig(:init, args)
+
+        quote do
+          @impl true
+          def unquote(named) do
+            unquote(body)
+          end
+        end |> strip_block
       end
 
     case sig do
       {name, _, [arg]} ->
         arg_name =
-          with {:\\, _, [name, _]} <- arg,
-            do: name
+          with {:\\, _, [arg_name, _]} <- arg,
+            do: arg_name
 
         quote do
-          unquote(init)
+          unquote({:__block__, [], inits})
 
           def unquote(name)(unquote(arg)) do
             GenServer.start_link(
@@ -52,7 +73,7 @@ defmodule Actr do
 
       name ->
         quote do
-          unquote(init)
+          unquote({:__block__, [], inits})
 
           def unquote(name) do
             GenServer.start_link(__MODULE__, [])
@@ -62,50 +83,44 @@ defmodule Actr do
   end
 
   defp inject_argument(arg, head) do
+    unhd =
+      fn
+        (h, t) when is_list(t) ->
+          [h|t]
+
+        (h, nil) ->
+          [h]
+      end
+
     case head do
       {:when, meta1, [sig, conds]} ->
-        {name, meta2, terms} = sig
+        {name, meta2, term} = sig
 
-        new_sig = {name, meta2, [arg|terms]}
+        new_sig = {name, meta2, unhd.(arg, term)}
 
         {:when, meta1, [new_sig, conds]}
 
-      {name, meta, terms} ->
-        {name, meta, [arg|terms]}
+      {name, meta, term} ->
+        {name, meta, unhd.(arg, term)}
     end
   end
 
-  defp make_private_def(type, fun) do
-    exploded = explode_fun fun
+  defp make_private_def(type, args, body) do
+    name =
+      case type do
+        :call -> :handle_call
+        :cast -> :handle_cast
+      end
 
-    case type do
-      :call ->
-        {[msg, from, state], body} = exploded
+    named =
+      inject_name_into_fun_sig(name, args)
 
-        quote do
-          @impl true
-          def handle_call(
-            unquote(msg),
-            unquote(from),
-            unquote(state)
-          ) do
-            unquote(body)
-          end
-        end
-
-      :cast ->
-        {[msg, state], body} = exploded
-
-        quote do
-          @impl true
-          def handle_cast(
-            unquote(msg),
-            unquote(state)
-          ) do
-            unquote(body)
-          end
-        end
-    end
+    quote do
+      @impl true
+      def unquote(named) do
+        unquote(body)
+      end
+    end |> strip_block
   end
 
   defp make_public_def(type, head) do
@@ -117,7 +132,7 @@ defmodule Actr do
     new_head = inject_argument(pid, head)
     new_arg  =
       case sig do
-        {name, _,    []} -> name
+        {name, _,   nil} -> name
         {name, _, [arg]} -> {name, arg}
       end
 
@@ -137,11 +152,16 @@ defmodule Actr do
   defp make_defs(type, head, fun)
       when type in [:call, :cast]
   do
+    privates =
+      Enum.flat_map explode_fun(fun), fn {args, body} ->
+        make_private_def(type, args, body)
+      end
+
     quote do
-      unquote(make_private_def(type, fun))
+      unquote({:__block__, [], privates})
 
       unquote(make_public_def(type, head))
-    end
+    end |> strip_block
   end
 
   defmacro defcall(head, fun),
