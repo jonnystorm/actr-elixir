@@ -17,14 +17,18 @@ defmodule Test do
 
   require Logger
 
+  # Define public API
   defcast update(new_value)
       when is_binary(new_value),
   fn
+    # Define private API
     ({_, new_value}, state) ->
       {:noreply, %{state|value: new_value}}
   end
 
+  # Define public API
   defcall get(:status), fn
+    # Define private API
     (_, _from, state) ->
       {:reply, {:ok, state.value}, state}
   end
@@ -37,6 +41,7 @@ defmodule Test do
     {:noreply, state}
   end
 
+  # Define public API; define private API
   deflink start_link, fn _args ->
     {:ok, %{value: "stuff"}}
   end

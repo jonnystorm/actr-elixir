@@ -46,4 +46,12 @@ defmodule ActrTest do
     assert TestServer.get(pid, :status)
       == {:ok, "things"}
   end
+
+  test "An unmatched public API clause blows us up",
+       %{pid: pid}
+  do
+    assert_raise FunctionClauseError, fn ->
+      TestServer.get(pid, :blarg)
+    end
+  end
 end
