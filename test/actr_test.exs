@@ -20,7 +20,7 @@ defmodule ActrTest do
     end
 
     def handle_info({:snap, from}, state) do
-      _ = send(from, "Snap!")
+      send(from, "Snap!")
 
       {:noreply, state}
     end
@@ -37,7 +37,8 @@ defmodule ActrTest do
     {:ok, pid: pid}
   end
 
-  test "It calls! It casts!", %{pid: pid} do
+  test "It calls! It casts!", %{pid: pid}
+  do
     assert TestServer.get(pid, :status)
       == {:ok, "stuff"}
 
@@ -47,11 +48,19 @@ defmodule ActrTest do
       == {:ok, "things"}
   end
 
-  test "An unmatched public API clause blows us up",
-       %{pid: pid}
+  test "An unmatched public API clause raises", %{pid: pid}
   do
     assert_raise FunctionClauseError, fn ->
       TestServer.get(pid, :blarg)
     end
+  end
+
+  test "An unmatched internal API clause exits", %{pid: pid}
+  do
+    Process.flag(:trap_exit, true)
+
+    send(pid, :blarg)
+
+    assert_receive {:EXIT, ^pid, {:function_clause, _}}
   end
 end

@@ -36,7 +36,7 @@ defmodule Test do
   # No macro `definfo`, because what would be the point?
   #
   def handle_info({:snap, from}, state) do
-    _ = send from, "Snap!"
+    send from, "Snap!"
 
     {:noreply, state}
   end

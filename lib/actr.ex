@@ -48,56 +48,27 @@ defmodule Actr do
     end
   end
 
-  defmacro defcall({:when, _, [sig, conds]}, fun) do
-    {name, _, [term]} = sig
- 
-    {[msg, from, state], body} =
-      explode_fun fun
+  defp inject_argument(arg, head) do
+    case head do
+      {:when, meta1, [sig, conds]} ->
+        {name, meta2, terms} = sig
 
-    quote do
-      @impl true
-      def handle_call(
-        unquote(msg),
-        unquote(from),
-        unquote(state)
-      ) do
-        unquote(body)
-      end
+        new_sig = {name, meta2, [arg|terms]}
 
-      unquote(
-        { :def, [], [
-            { :when, [], [
-                {name, [], [{:pid, [], nil}, term]},
-                conds
-              ]
-            },
-            [ { :do,
-                { {:., [], [
-                      {:__aliases__, [alias: false], [:GenServer]},
-                      :call
-                    ]
-                  },
-                  [],
-                  [ {:pid, [], nil},
-                    {:update, {:new_value, [], nil}},
-                  ]
-                }
-              }
-            ],
-          ]
-        }
-      )
+        {:when, meta1, [new_sig, conds]}
+
+      {name, meta, terms} ->
+        {name, meta, [arg|terms]}
     end
   end
 
-  defmacro defcall(sig, fun) do
-    {name, _, args} = sig
+  defp make_private_def(type, fun) do
+    exploded = explode_fun fun
 
-    {[msg, from, state], body} =
-      explode_fun fun
+    case type do
+      :call ->
+        {[msg, from, state], body} = exploded
 
-    case args do
-      [] ->
         quote do
           @impl true
           def handle_call(
@@ -107,110 +78,63 @@ defmodule Actr do
           ) do
             unquote(body)
           end
-
-          def unquote(name)(pid) do
-            GenServer.call(pid, unquote(name))
-          end
         end
 
-      [term] ->
+      :cast ->
+        {[msg, state], body} = exploded
+
         quote do
           @impl true
-          def handle_call(
+          def handle_cast(
             unquote(msg),
-            unquote(from),
             unquote(state)
           ) do
             unquote(body)
-          end
-
-          def unquote(name)(pid, unquote(term)) do
-            GenServer.call pid,
-              {unquote(name), unquote(term)}
           end
         end
     end
   end
 
-  defmacro defcast({:when, _, [sig, conds]}, fun) do
-    {name, _, [term]} = sig
+  defp make_public_def(type, head) do
+    pid = {:pid, [], nil}
+    sig =
+      with {:when, _, [sig, _]} <- head,
+        do: sig
 
-    {[msg, state], body} =
-      explode_fun fun
-
-    quote do
-      @impl true
-      def handle_cast(
-        unquote(msg),
-        unquote(state)
-      ) do
-        unquote(body)
+    new_head = inject_argument(pid, head)
+    new_arg  =
+      case sig do
+        {name, _,    []} -> name
+        {name, _, [arg]} -> {name, arg}
       end
 
-      unquote(
-        { :def, [], [
-            { :when, [], [
-                {name, [], [{:pid, [], nil}, term]},
-                conds
-              ]
-            },
-            [ { :do,
-                { {:., [], [
-                      {:__aliases__, [alias: false], [:GenServer]},
-                      :cast
-                    ]
-                  },
-                  [],
-                  [ {:pid, [], nil},
-                    {:update, {:new_value, [], nil}},
-                  ]
-                }
-              }
-            ],
+    quote do
+      def unquote(new_head) do
+        apply(
+          GenServer,
+          unquote(type),
+          [ unquote(pid),
+            unquote(new_arg),
           ]
-        }
-      )
+        )
+      end
     end
   end
 
-  defmacro defcast(sig, fun) do
-    {name, _, args} = sig
+  defp make_defs(type, head, fun)
+      when type in [:call, :cast]
+  do
+    quote do
+      unquote(make_private_def(type, fun))
 
-    {[msg, state], body} =
-      explode_fun fun
-
-    case args do
-      [] ->
-        quote do
-          @impl true
-          def handle_cast(
-            unquote(msg),
-            unquote(state)
-          ) do
-            unquote(body)
-          end
-
-          def unquote(name)(pid) do
-            GenServer.cast(pid, unquote(name))
-          end
-        end
-
-      [term] ->
-        quote do
-          @impl true
-          def handle_cast(
-            unquote(msg),
-            unquote(state)
-          ) do
-            unquote(body)
-          end
-
-          def unquote(name)(pid, unquote(term)) do
-            GenServer.cast pid,
-              {unquote(name), unquote(term)}
-          end
-        end
+      unquote(make_public_def(type, head))
     end
   end
+
+  defmacro defcall(head, fun),
+    do: make_defs(:call, head, fun)
+
+  defmacro defcast(head, fun),
+    do: make_defs(:cast, head, fun)
 end
 
