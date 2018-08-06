@@ -22,14 +22,14 @@ defmodule Test do
       when is_binary(new_value),
   fn
     # Define private API
-    ({_, new_value}, state) ->
+    ({:update, new_value}, state) ->
       {:noreply, %{state|value: new_value}}
   end
 
   # Define public API
   defcall get(:status), fn
     # Define private API
-    (_, _from, state) ->
+    (:status, _from, state) ->
       {:reply, {:ok, state.value}, state}
   end
 
