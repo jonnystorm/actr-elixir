@@ -15,8 +15,6 @@ private API signature side by side. Sometimes I'm just lazy.
 defmodule Test do
   use Actr
 
-  require Logger
-
   # Define public API
   defcast update(new_value)
       when is_binary(new_value),
