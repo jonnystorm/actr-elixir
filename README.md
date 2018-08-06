@@ -68,6 +68,8 @@ defmodule TestServer do
       {:reply, {:ok, state.value}, state}
   end
 
+  # No `definfo` macro, because what would be the point?
+  #
   @impl true
   def handle_info({:snap, from}, state) do
     send(from, "Snap!")
