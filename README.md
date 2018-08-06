@@ -6,7 +6,7 @@ Macros for more concise GenServers
 
 Sometimes I just want to write one definition and see all
 my GenServer functionality in a single 24-line page.
-Sometimes I just want to see public API signature and my
+Sometimes I just want to see my public API signature and my
 private API signature side by side. Sometimes I'm just lazy.
 
 ## Usage
