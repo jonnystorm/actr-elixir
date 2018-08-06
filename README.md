@@ -1,5 +1,7 @@
 # Actr
 
+[![pipeline status](https://gitlab.com/jonnystorm/actr-elixir/badges/master/pipeline.svg)](https://gitlab.com/jonnystorm/actr-elixir/commits/master)
+
 Macros for more concise GenServers
 
 ## Why?
