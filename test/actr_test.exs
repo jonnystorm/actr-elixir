@@ -66,7 +66,7 @@ defmodule ActrTest do
     end
   end
 
-  test "An unmatched internal API clause exits", %{pid: pid}
+  test "An unmatched private API clause exits", %{pid: pid}
   do
     Process.flag(:trap_exit, true)
 
